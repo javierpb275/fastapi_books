@@ -1,12 +1,12 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Body
 
 app = FastAPI()
 
 BOOKS = [
     {
-        'title': 'Title One',
-        'author': 'Author One',
-        'category': 'Science'
+        "title": "Title One",
+        "author": "Author One",
+        "category": "Science"
     },
     {
         'title': 'Title Two',
@@ -72,3 +72,18 @@ async def find_books_by_path_author_and_by_query_category(book_author: str, cate
                 'category').casefold() == category.casefold():
             books.append(book)
     return books
+
+
+@app.post("/api/books/create_book")
+async def create_book(book: dict = Body()):
+    BOOKS.append(book)
+    return book
+
+
+@app.put("/api/books/update_book")
+async def update_book(book: dict = Body()):
+    for i in range(len(BOOKS)):
+        if BOOKS[i].get('title').casefold() == book.get('title').casefold():
+            BOOKS[i] = book
+            return BOOKS[i]
+    return {'message': 'Book Not Found'}
