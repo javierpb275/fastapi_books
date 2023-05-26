@@ -64,6 +64,24 @@ async def find_books_by_query_category(category: str):
     return books
 
 
+@app.get("/api/books/by_author/{author}")
+async def find_books_by_path_author(author: str):
+    books = []
+    for book in BOOKS:
+        if book.get('author').casefold() == author.casefold():
+            books.append(book)
+    return books
+
+
+@app.get("/api/books/by_author/")
+async def find_books_by_query_author(author: str):
+    books = []
+    for book in BOOKS:
+        if book.get('author').casefold() == author.casefold():
+            books.append(book)
+    return books
+
+
 @app.get("/api/books/{book_author}/")
 async def find_books_by_path_author_and_by_query_category(book_author: str, category: str):
     books = []
@@ -86,4 +104,13 @@ async def update_book(book: dict = Body()):
         if BOOKS[i].get('title').casefold() == book.get('title').casefold():
             BOOKS[i] = book
             return BOOKS[i]
+    return {'message': 'Book Not Found'}
+
+
+@app.delete("/api/books/delete_book/{book_title}")
+async def delete_book(book_title: str):
+    for i in range(len(BOOKS)):
+        if BOOKS[i].get('title').casefold() == book_title.casefold():
+            deleted_book = BOOKS.pop(i)
+            return {"message": f"Book '{deleted_book['title']}' deleted"}
     return {'message': 'Book Not Found'}
