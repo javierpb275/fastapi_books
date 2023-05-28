@@ -25,7 +25,7 @@ class Book:
 
 class BookRequest(BaseModel):
     id: Optional[int] = Field(title='id is not needed')
-    search: Optional[str] = Field(title='Just for filtering')
+    search: Optional[str] = Field(title='search is just for filtering')
     title: str = Field(min_length=3)
     author: str = Field(min_length=1)
     description: str = Field(min_length=1, max_length=100)
@@ -88,7 +88,7 @@ async def read_all_books(
     return {
         "total_books": total_books,
         "books": [
-            {k: v for k, v in book.__dict__.items() if k != 'search'}
+            remove_keys(book.__dict__, "search")
             for book in paginated_books
         ]
     }
@@ -98,7 +98,8 @@ async def read_all_books(
 async def read_book(id: int):
     for book in BOOKS:
         if book.id == id:
-            return {k: v for k, v in book.__dict__.items() if k != 'search'}
+            response = remove_keys(book.__dict__, "search")
+            return response
     return {'message': 'Book Not Found'}
 
 
@@ -107,7 +108,31 @@ async def create_book(book_request: BookRequest):
     book = Book(**book_request.dict())
     new_book = set_book_search(set_book_id(book))
     BOOKS.append(new_book)
-    return {k: v for k, v in new_book.__dict__.items() if k != "search"}
+    response = remove_keys(new_book.__dict__, "search")
+    return response
+
+
+@app.put("/api/books/{id}")
+async def update_book(id: int, book_request: BookRequest):
+    for i in range(len(BOOKS)):
+        if BOOKS[i].id == id:
+            book_data = book_request.dict()
+            book_data["id"] = id
+            book = Book(**book_data)
+            BOOKS[i] = set_book_search(book)
+            response = remove_keys(BOOKS[i].__dict__, "search")
+            return response
+    return {'message': 'Book Not Found'}
+
+
+@app.delete("/api/books/{id}")
+async def delete_book(id: int):
+    for i in range(len(BOOKS)):
+        if BOOKS[i].id == id:
+            book_deleted = BOOKS.pop(i)
+            response = remove_keys(book_deleted.__dict__, "search")
+            return response
+    return {'message': 'Book Not Found'}
 
 
 def set_book_id(book: Book) -> Book:
@@ -118,3 +143,10 @@ def set_book_id(book: Book) -> Book:
 def set_book_search(book: Book) -> Book:
     book.search = f"{book.title} {book.author} {book.rating}"
     return book
+
+
+def remove_keys(dictionary: dict, *keys_to_remove: str) -> dict:
+    new_dictionary: dict = dictionary.copy()
+    for key in keys_to_remove:
+        new_dictionary.pop(key, None)
+    return new_dictionary
