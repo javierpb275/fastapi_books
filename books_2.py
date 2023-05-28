@@ -1,4 +1,5 @@
 from typing import Optional
+from datetime import date
 
 from fastapi import FastAPI, Query
 from pydantic import BaseModel, Field
@@ -7,20 +8,23 @@ app = FastAPI()
 
 
 class Book:
-    id: int
-    search: str
-    title: str
-    author: str
-    description: str
-    rating: int
-
-    def __init__(self, id, search, title, author, description, rating):
+    def __init__(
+            self,
+            id: int,
+            search: str,
+            title: str,
+            author: str,
+            description: str,
+            rating: int,
+            published_date: date
+    ):
         self.id = id
         self.search = search
         self.title = title
         self.author = author
         self.description = description
         self.rating = rating
+        self.published_date = published_date
 
 
 class BookRequest(BaseModel):
@@ -30,6 +34,7 @@ class BookRequest(BaseModel):
     author: str = Field(min_length=1)
     description: str = Field(min_length=1, max_length=100)
     rating: int = Field(gt=-1, lt=6)  # 0 - 5
+    published_date: Optional[date] = Field(title='date when the book was published')
 
     class Config:
         schema_extra = {
@@ -37,41 +42,44 @@ class BookRequest(BaseModel):
                 'title': 'New Book',
                 'author': 'New Author',
                 'description': 'New Description',
-                'rating': 5
+                'rating': 5,
+                'published_date': '2023-05-28'
             }
         }
 
 
 BOOKS = [
-    Book(1, 'Computer Science Javier 5', 'Computer Science', 'Javier', 'Great book', 5),
-    Book(2, 'FastAPI Roby 5', 'FastAPI', 'Roby', 'Very nice book!', 5),
-    Book(3, 'Lord of the rings J.R.R. Tolkien 4', 'Lord of the rings', 'J.R.R. Tolkien', 'Really exciting', 4),
-    Book(4, 'Harry Potter J.K. Rowling 4', 'Harry Potter', 'J.K. Rowling', 'Amazing', 4),
-    Book(5, 'Whatever Pepe 3', 'Whatever', 'Pepe', 'It is ok...', 3),
-    Book(6, 'Whatever 2 Pepe 2', 'Whatever 2', 'Pepe', 'Even worst than the first one', 2),
+    Book(1, 'Computer Science Javier 5', 'Computer Science', 'Javier', 'Great book', 5, date(2021, 1, 1)),
+    Book(2, 'FastAPI Roby 5', 'FastAPI', 'Roby', 'Very nice book!', 5, date(2022, 2, 2)),
+    Book(3, 'Lord of the rings J.R.R. Tolkien 4', 'Lord of the rings', 'J.R.R. Tolkien', 'Really exciting', 4, date(2023, 3, 3)),
+    Book(4, 'Harry Potter J.K. Rowling 4', 'Harry Potter', 'J.K. Rowling', 'Amazing', 4, date(2024, 4, 4)),
+    Book(5, 'Whatever Pepe 3', 'Whatever', 'Pepe', 'It is ok...', 3, date(2025, 5, 5)),
+    Book(6, 'Whatever 2 Pepe 2', 'Whatever 2', 'Pepe', 'Even worse than the first one', 2, date(2026, 6, 6)),
 ]
 
 
 @app.get("/api/books")
 async def read_all_books(
-        title: Optional[str] = Query(None, min_length=1, alias="book_title"),
-        search: Optional[str] = Query(None, min_length=1),
-        author: Optional[str] = Query(None, min_length=1),
-        description: Optional[str] = Query(None, min_length=1),
-        rating: Optional[int] = Query(None, ge=0, le=5),
-        sort_by: Optional[str] = Query(None, regex=r"^(id|title|author|rating)$"),
-        sort_order: Optional[str] = Query("asc", regex=r"^(asc|desc)$"),
-        page: int = Query(1, ge=1),
-        page_size: int = Query(10, ge=1, le=100)
+    title: Optional[str] = Query(None, min_length=1, alias="book_title"),
+    search: Optional[str] = Query(None, min_length=1),
+    author: Optional[str] = Query(None, min_length=1),
+    description: Optional[str] = Query(None, min_length=1),
+    rating: Optional[int] = Query(None, ge=0, le=5),
+    published_date: Optional[date] = Query(None),
+    sort_by: Optional[str] = Query(None, regex=r"^(id|title|author|rating|published_date)$"),
+    sort_order: Optional[str] = Query("asc", regex=r"^(asc|desc)$"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100)
 ):
     filtered_books = []
     for book in BOOKS:
         if (
-                (title is None or book.title.lower().find(title.lower()) != -1)
-                and (search is None or book.search.lower().find(search.lower()) != -1)
-                and (author is None or book.author.lower().find(author.lower()) != -1)
-                and (description is None or book.description.lower().find(description.lower()) != -1)
-                and (rating is None or book.rating == rating)
+            (title is None or book.title.lower().find(title.lower()) != -1)
+            and (search is None or book.search.lower().find(search.lower()) != -1)
+            and (author is None or book.author.lower().find(author.lower()) != -1)
+            and (description is None or book.description.lower().find(description.lower()) != -1)
+            and (rating is None or book.rating == rating)
+            and (published_date is None or book.published_date == published_date)
         ):
             filtered_books.append(book)
 
@@ -105,6 +113,8 @@ async def read_book(id: int):
 
 @app.post("/api/books")
 async def create_book(book_request: BookRequest):
+    if book_request.published_date is None:
+        book_request.published_date = date.today()
     book = Book(**book_request.dict())
     new_book = set_book_search(set_book_id(book))
     BOOKS.append(new_book)
@@ -118,6 +128,8 @@ async def update_book(id: int, book_request: BookRequest):
         if BOOKS[i].id == id:
             book_data = book_request.dict()
             book_data["id"] = id
+            if book_request.published_date is None:
+                book_data["published_date"] = BOOKS[i].published_date
             book = Book(**book_data)
             BOOKS[i] = set_book_search(book)
             response = remove_keys(BOOKS[i].__dict__, "search")
