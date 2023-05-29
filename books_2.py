@@ -1,8 +1,9 @@
 from typing import Optional
 from datetime import date
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Path, HTTPException
 from pydantic import BaseModel, Field
+from starlette import status
 
 app = FastAPI()
 
@@ -58,7 +59,7 @@ BOOKS = [
 ]
 
 
-@app.get("/api/books")
+@app.get("/api/books", status_code=status.HTTP_200_OK)
 async def read_all_books(
     title: Optional[str] = Query(None, min_length=1, alias="book_title"),
     search: Optional[str] = Query(None, min_length=1),
@@ -66,7 +67,7 @@ async def read_all_books(
     description: Optional[str] = Query(None, min_length=1),
     rating: Optional[int] = Query(None, ge=0, le=5),
     published_date: Optional[date] = Query(None),
-    sort_by: Optional[str] = Query(None, regex=r"^(id|title|author|rating|published_date)$"),
+    sort_by: Optional[str] = Query("id", regex=r"^(id|title|author|rating|published_date)$"),
     sort_order: Optional[str] = Query("asc", regex=r"^(asc|desc)$"),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100)
@@ -102,16 +103,16 @@ async def read_all_books(
     }
 
 
-@app.get("/api/books/{id}")
-async def read_book(id: int):
+@app.get("/api/books/{id}", status_code=status.HTTP_200_OK)
+async def read_book(id: int = Path(gt=0)):
     for book in BOOKS:
         if book.id == id:
             response = remove_keys(book.__dict__, "search")
             return response
-    return {'message': 'Book Not Found'}
+    raise HTTPException(status_code=404, detail='Book Not Found')
 
 
-@app.post("/api/books")
+@app.post("/api/books", status_code=status.HTTP_201_CREATED)
 async def create_book(book_request: BookRequest):
     if book_request.published_date is None:
         book_request.published_date = date.today()
@@ -122,8 +123,8 @@ async def create_book(book_request: BookRequest):
     return response
 
 
-@app.put("/api/books/{id}")
-async def update_book(id: int, book_request: BookRequest):
+@app.put("/api/books/{id}", status_code=status.HTTP_200_OK)
+async def update_book(book_request: BookRequest, id: int = Path(gt=0)):
     for i in range(len(BOOKS)):
         if BOOKS[i].id == id:
             book_data = book_request.dict()
@@ -134,17 +135,17 @@ async def update_book(id: int, book_request: BookRequest):
             BOOKS[i] = set_book_search(book)
             response = remove_keys(BOOKS[i].__dict__, "search")
             return response
-    return {'message': 'Book Not Found'}
+    raise HTTPException(status_code=404, detail='Book Not Found')
 
 
-@app.delete("/api/books/{id}")
-async def delete_book(id: int):
+@app.delete("/api/books/{id}", status_code=status.HTTP_200_OK)
+async def delete_book(id: int = Path(gt=0)):
     for i in range(len(BOOKS)):
         if BOOKS[i].id == id:
             book_deleted = BOOKS.pop(i)
             response = remove_keys(book_deleted.__dict__, "search")
             return response
-    return {'message': 'Book Not Found'}
+    raise HTTPException(status_code=404, detail='Book Not Found')
 
 
 def set_book_id(book: Book) -> Book:
